@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horizon Group | MSE Portfolio Tracker</title>
+
+<!-- Google API for Drive -->
+<script src="https://apis.google.com/js/api.js"></script>
+<!-- Chart.js -->
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+:root{
+  --primary:#0b3d91;
+  --accent:#f4b400;
+  --bg:#f4f6f9;
+}
+body{
+  margin:0;
+  font-family:Arial, sans-serif;
+  background:var(--bg);
+}
+header{
+  background:var(--primary);
+  color:white;
+  padding:20px;
+  text-align:center;
+}
+header h1{margin:0;}
+header p{margin:5px 0 0; font-size:14px;}
+
+nav{
+  display:flex;
+  justify-content:space-around;
+  background:var(--primary);
+  flex-wrap:wrap;
+}
+nav button{
+  background:none;
+  border:none;
+  color:white;
+  padding:12px;
+  font-size:16px;
+  cursor:pointer;
+}
+nav button:hover{color:var(--accent);}
+
+section{display:none;padding:20px;}
+section.active{display:block;}
+
+.card{
+  background:white;
+  padding:20px;
+  border-radius:12px;
+  box-shadow:0 4px 6px rgba(0,0,0,.1);
+  margin:10px auto;
+  max-width:300px;
+  text-align:center;
+}
+
+input,textarea{
+  width:100%;
+  padding:10px;
+  margin:8px 0;
+}
+button{
+  background:var(--primary);
+  color:white;
+  border:none;
+  border-radius:6px;
+  padding:12px;
+  cursor:pointer;
+}
+button:hover{background:#092f6b;}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+  background:white;
+}
+th,td{
+  padding:10px;
+  border-bottom:1px solid #ddd;
+  text-align:center;
+}
+th{background:var(--primary);color:white;}
+
+.contact-btn{
+  display:inline-block;
+  margin:8px;
+  padding:12px 18px;
+  background:var(--primary);
+  color:white;
+  border-radius:8px;
+  text-decoration:none;
+  font-size:16px;
+}
+.contact-btn:hover{background:#092f6b;}
+
+footer{
+  background:var(--primary);
+  color:white;
+  text-align:center;
+  padding:20px;
+}
+</style>
+</head>
+<body onload="handleClientLoad()">
+
+<header>
+  <h1>Horizon Group</h1>
+  <p>Malawi Stock Exchange Portfolio Tracker</p>
+</header>
+
+<section id="login" class="active">
+  <h2>Login</h2>
+  <button onclick="loginGoogle()">Login with Google</button>
+</section>
+
+<nav>
+  <button onclick="showSection('dashboard')">Dashboard</button>
+  <button onclick="showSection('add')">Add Stock</button>
+  <button onclick="showSection('table')">Portfolio</button>
+  <button onclick="showSection('graph')">Graph</button>
+  <button onclick="showSection('contact')">Contact</button>
+</nav>
+
+<section id="dashboard">
+  <div class="card">
+    <h3>Total Value</h3>
+    <p id="totalValue">MWK 0</p>
+  </div>
+  <div class="card">
+    <h3>Total Stocks</h3>
+    <p id="totalStocks">0</p>
+  </div>
+</section>
+
+<section id="add">
+  <h2>Add Stock</h2>
+  <input id="name" placeholder="Stock Name">
+  <input id="price" type="number" placeholder="Price (MWK)">
+  <input id="qty" type="number" placeholder="Quantity">
+  <input id="date" type="date">
+  <button onclick="addStock()">Save Stock</button>
+</section>
+
+<section id="table">
+  <h2>Portfolio Table</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Name</th><th>Price</th><th>Qty</th><th>Date</th><th>Total</th>
+      </tr>
+    </thead>
+    <tbody id="tbody"></tbody>
+  </table>
+</section>
+
+<section id="graph">
+  <h2>Portfolio Graph</h2>
+  <canvas id="chart"></canvas>
+</section>
+
+<section id="contact">
+  <h2>Contact Us</h2>
+
+  <a class="contact-btn" href="https://wa.me/265888110766?text=Hello%20Horizon%20Group" target="_blank">🟢 WhatsApp</a>
+  <a class="contact-btn" href="tel:0888110766">📞 Call</a>
+
+  <hr>
+
+  <input id="c_name" placeholder="Your Name">
+  <input id="c_email" type="email" placeholder="Your Email">
+  <textarea id="c_message" placeholder="Write your message here..." rows="5"></textarea>
+  <button onclick="sendEmail()">Send Email</button>
+</section>
+
+<footer>
+  <p>© 2025 Horizon Group</p>
+</footer>
+
+<script>
+const CLIENT_ID="149755655854-91nkprgpuq5ahfjv7mpk3gn4bj0m56j6.apps.googleusercontent.com";
+const SCOPES="https://www.googleapis.com/auth/drive.file";
+
+let portfolio=[], chartObj;
+
+function handleClientLoad(){
+  gapi.load('client:auth2',()=>gapi.client.init({clientId:CLIENT_ID,scope:SCOPES}));
+}
+
+function loginGoogle(){
+  gapi.auth2.getAuthInstance().signIn().then(()=>{
+    document.getElementById("login").style.display="none";
+    showSection('dashboard');
+  });
+}
+
+function showSection(id){
+  document.querySelectorAll("section").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+  update();
+}
+
+function addStock(){
+  if(!name.value||!price.value||!qty.value||!date.value){
+    alert("Fill all fields"); return;
+  }
+  portfolio.push({n:name.value,p:+price.value,q:+qty.value,d:date.value});
+  update();
+}
+
+function update(){
+  let total=0;
+  tbody.innerHTML="";
+  portfolio.forEach(s=>{
+    total+=s.p*s.q;
+    tbody.innerHTML+=`<tr>
+      <td>${s.n}</td><td>${s.p}</td><td>${s.q}</td><td>${s.d}</td><td>${s.p*s.q}</td>
+    </tr>`;
+  });
+  totalValue.innerText="MWK "+total.toLocaleString();
+  totalStocks.innerText=portfolio.length;
+
+  if(chartObj) chartObj.destroy();
+  chartObj=new Chart(chart,{
+    type:"pie",
+    data:{
+      labels:portfolio.map(s=>s.n),
+      datasets:[{data:portfolio.map(s=>s.p*s.q),backgroundColor:"#0b3d91"}]
+    }
+  });
+}
+
+function sendEmail(){
+  if(!c_name.value||!c_email.value||!c_message.value){
+    alert("Fill all fields"); return;
+  }
+  const subject=encodeURIComponent("Contact from Horizon Group Website");
+  const body=encodeURIComponent(
+    "Name: "+c_name.value+"\nEmail: "+c_email.value+"\n\n"+c_message.value
+  );
+  window.location.href=`mailto:Infoinvesthorizon@gmail.com?subject=${subject}&body=${body}`;
+}
+</script>
+
+</body>
+</html>
